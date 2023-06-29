@@ -9,7 +9,7 @@
 
 # Thie file needs to be run under folder 'models'
 from ogb.nodeproppred import Evaluator
-import argparse
+from argparse import ArgumentParser
 import numpy as np
 import torch
 from torch_geometric.nn import GCNConv, ChebConv  # noqa
@@ -18,7 +18,7 @@ import os
 import random
 import time
 import fcntl
-from xhd_source.notebook_argparse import ArgumentParser
+# from xhd_source.notebook_argparse import ArgumentParser
 
 import sys
 sys.path.append('../../')
@@ -30,9 +30,6 @@ sys.path.append('../../pnode/')
 petsc4py_path = os.path.join(os.environ["PETSC_DIR"], os.environ["PETSC_ARCH"], "lib")
 sys.path.append(petsc4py_path)
 import petsc4py
-
-
-
 
 
 import proxNode.lib.prox.odeprox as odeprox
@@ -88,6 +85,7 @@ def get_label_masks(data, mask_rate=0.5):
 
 
 def train(model, optimizer, data, rec=None):
+    model.odeblock.training = True
     model.train()
     optimizer.zero_grad()
     feat = data.x
@@ -126,6 +124,7 @@ def train(model, optimizer, data, rec=None):
 @torch.no_grad()
 def test(model, data, opt=None):  # opt required for runtime polymorphism
     #import pdb; pdb.set_trace()
+    model.odeblock.training = False
     model.eval()
     feat = data.x
     
@@ -414,8 +413,13 @@ if __name__ == '__main__':
     cmdstr = '--dataset CoauthorCS --adjoint_method adaptive_heun --num_train_per_class 20 --time 10 --epoch 50 '
     cmdstr += '--block constant --function transformer --no_early'
     #cmdstr += '--prox' --method dopri5
-    cmdstr += ' '.join(sys.argv[1:])
-    args = parser.parse_args(cmdstr) 
+    # cmdstr += ' '.join(sys.argv[1:])
+    cmdstr = cmdstr.split(' ') + sys.argv[1:]  
+    args, unknown = parser.parse_known_args(cmdstr)
+
+    # args = parser.parse_args(cmdstr) 
+    sys.argv = [sys.argv[0]] + unknown
+    petsc4py.init(sys.argv)
 
 
     opt = vars(args)
