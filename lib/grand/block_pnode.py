@@ -26,13 +26,12 @@ class PNODEblock(ODEblock):
     self.odefunc.edge_weight = edge_weight.to(device)
     self.reg_odefunc.odefunc.edge_index, self.reg_odefunc.odefunc.edge_weight = self.odefunc.edge_index, self.odefunc.edge_weight
 
-    #construct an ODEPetsc object
-    self.ode = petsc_adjoint.ODEPetsc()
-    #import pdb;pdb.set_trace()
     #set up the RHS function and method
     self.final_func = self.reg_odefunc if self.training and self.nreg > 0 else self.odefunc
-    #import pdb;pdb.set_trace()
-
+    #construct an ODEPetsc object
+    self.ode_train = petsc_adjoint.ODEPetsc()
+    #construct an ODEPetsc object
+    self.ode_test = petsc_adjoint.ODEPetsc()
 
   def forward(self, x):
     t = self.t.type_as(x)
@@ -42,7 +41,7 @@ class PNODEblock(ODEblock):
     state = (x,) + reg_states if self.training and self.nreg > 0 else x
   
     if self.training:
-      self.ode.setupTS(
+      self.ode_train.setupTS(
           state,
           self.final_func,
           step_size=self.opt['step_size'],
@@ -50,8 +49,9 @@ class PNODEblock(ODEblock):
           use_dlpack=self.opt['use_dlpack'],
           method=self.opt['method'],
       )
+      state_dt = self.ode_train.odeint_adjoint(state, t)
     else:
-      self.ode.setupTS(
+      self.ode_test.setupTS(
           state,
           self.final_func,
           step_size=self.opt['step_size'],
@@ -59,8 +59,8 @@ class PNODEblock(ODEblock):
           use_dlpack=self.opt['use_dlpack'],
           method=self.opt['method'],
       )
+      state_dt = self.ode_test.odeint_adjoint(state, t)
 
-    state_dt = self.ode.odeint_adjoint(state, t)
     if self.training and self.nreg > 0:
       z = state_dt[0,1]
       reg_states = tuple( st[1] for st in state_dt[1:] )
