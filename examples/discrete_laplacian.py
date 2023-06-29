@@ -23,12 +23,12 @@ ODE
 class ode(nn.Module):
     def __init__(self,dx):
         super().__init__()
-        self.dx = dx
-        self.c = 1/dx/dx
+        self.dx = dx #get the ODE RHS function
+        self.c = 1/dx/dx #elementwise, finite difference 1/dx^2
         self.nfe = 0
     def forward(self,t,x):
         self.nfe += 1
-        return self.c*(torch.roll(x,1)+torch.roll(x,-1)-2*x)
+        return self.c*(torch.roll(x,1)+torch.roll(x,-1)-2*x) #elementwise, second order central finite difference: d^2 h / dx^2
 
 """
 ODE Solver
@@ -38,13 +38,13 @@ class solver(nn.Module):
     def __init__(self, func, opt, **kwargs):
         super(solver, self).__init__()
         self.func = func
-        self.opt = opt
+        self.opt = opt #get options
         
     def forward(self, t, x):
-        opt=self.opt
-        if opt['prox_method'] in ('dopri5', 'adaptive_heun'):
+        opt=self.opt #judt to simplify the code?
+        if opt['prox_method'] in ('dopri5', 'adaptive_heun'): #only two explicit methods, use odeint in torchdiffeq 
             out = odeint_default(self.func, x, t, method=opt['prox_method'],rtol=opt['rtol'],atol=opt['atol'])
-        else:
+        else: #rest are implicit methods
             out = odeint(self.func, x, t, opt_method=opt['opt_method'],prox_method=opt['prox_method'],
                         int_step=opt['int_step'],opt_step=opt['opt_step'],
                         options=self.opt)
@@ -120,20 +120,20 @@ def fft_solve(y0,dx,t):
 
 """ Grid Configuration """
 
-n = 128
-itv = [0, 1]
-t = 1
-h0 = torch.randn(n)
+n = 128 #set up a number of steps in spacial domain
+itv = [0, 1] #spacial domain interval
+t = 1 #final time stamp
+h0 = torch.randn(n) #random start for n postion at t=0
 
 # Prep
-dx = (itv[1]-itv[0])/n
-xrange = torch.arange(itv[0], itv[1], dx)
-h0 = torch.nn.Parameter(h0)
+dx = (itv[1]-itv[0])/n #evenly spaced step size in spacial domain
+xrange = torch.arange(itv[0], itv[1], dx) #n points from itv[0] to n*dx+itv[0]
+h0 = torch.nn.Parameter(h0) #make tensor h0 into a parameter tensor requiring gradient
 
 
-true = fft_solve(h0,dx,t).to(DEVICE)
-t = torch.Tensor([0,t]).to(DEVICE)
-h0=h0.to(DEVICE)
+true = fft_solve(h0,dx,t).to(DEVICE) #true solution [0,t]
+t = torch.Tensor([0,t]).to(DEVICE) #time interval: [0,t]
+h0=h0.to(DEVICE) #
 
 
 """
