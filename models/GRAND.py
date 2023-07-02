@@ -25,7 +25,7 @@ sys.path.append('../../')
 sys.path.append('../lib/grand/')
 sys.path.append('../../HeavyBallNODE/')
 sys.path.append('../../torchdiffeq/')
-sys.path.append('../../pnode/')
+sys.path.append('../lib/pnode/')
 
 petsc4py_path = os.path.join(os.environ["PETSC_DIR"], os.environ["PETSC_ARCH"], "lib")
 sys.path.append(petsc4py_path)
@@ -95,7 +95,7 @@ def train(model, optimizer, data, rec=None):
         feat = add_labels(feat, data.y, train_label_idx, model.num_classes, model.device)
     else:
         train_pred_idx = data.train_mask
-
+    import pdb;pdb.set_trace()
     out = model(feat)
     if model.opt['dataset'] == 'ogbn-arxiv':
         lf = torch.nn.functional.nll_loss
@@ -225,12 +225,18 @@ def main(cmd_opt, rec):
     optimizer = get_optimizer(opt['optimizer'], parameters, lr=opt['lr'], weight_decay=opt['decay'])
     best_time = val_acc = test_acc = train_acc = best_epoch = 0
     this_test = test_OGB if opt['dataset'] == 'ogbn-arxiv' else test
-
-    with open('./output.txt', 'w') as file:
+    if opt['prox']:
+        filename = './prox_{}.txt'.format(opt['prox_method'])
+    elif opt['block'] == 'pnode':
+        filename = './pnode_{}.txt'.format(opt['adjoint_method'])
+    else:
+        filename = './{}.txt'.format(opt['adjoint_method'])
+    #import pdb;pdb.set_trace()
+    with open(filename, 'w') as file:
         for epoch in range(1, opt['epoch']+1):
-            #import pdb;pdb.set_trace()
             start_time = time.time()
             tmp_train_acc, tmp_val_acc, tmp_test_acc = this_test(model, data, opt)
+            import pdb;pdb.set_trace()
             loss = train(model, optimizer, data)
 
             if tmp_val_acc > val_acc:
@@ -256,7 +262,7 @@ def main(cmd_opt, rec):
 
             # Write the log string to the file
             file.write(myresult + '\n')
-            
+        file.close()
     rec['fnfe'] = fnfe / opt['epoch']
     rec['bnfe'] = bnfe / opt['epoch']
     rec['trloss'] = loss 
@@ -402,7 +408,8 @@ if __name__ == '__main__':
     # new args
     parser.add_argument('--prox', action='store_true')
     parser.add_argument('--geom_gcn_splits', action='store_true', default=False)
-    
+    parser.add_argument("--prox_method", type=str, default="crank_nicolson",
+                        help="set the prox solver for the backward pass: crank_nicolson, euler, euler3, bdf2, bdf3, bdf4")
     # pnode args
     parser.add_argument("--implicit_form", action="store_true")
     parser.add_argument("--double_prec", action="store_true")
@@ -410,28 +417,32 @@ if __name__ == '__main__':
 
 
     # change here for different methods
-    cmdstr = '--dataset CoauthorCS --adjoint_method adaptive_heun --num_train_per_class 20 --time 10 --epoch 50 '
+    cmdstr = '--dataset CoauthorCS --adjoint_method dopri8 --num_train_per_class 20 --time 10 --epoch 50 '
     cmdstr += '--block constant --function transformer --no_early'
     #cmdstr += '--prox' --method dopri5
-    # cmdstr += ' '.join(sys.argv[1:])
-    cmdstr = cmdstr.split(' ') + sys.argv[1:]  
+    cmdstr = cmdstr.split(' ') + sys.argv[1:]
     args, unknown = parser.parse_known_args(cmdstr)
-
     # args = parser.parse_args(cmdstr) 
-    sys.argv = [sys.argv[0]] + unknown
-    petsc4py.init(sys.argv)
-
-
     opt = vars(args)
+    if opt['block'] == 'pnode':
+        sys.argv = [sys.argv[0]] + unknown
+        petsc4py.init(sys.argv)
+
+    
     adjoint_methods = ['dopri5', 'adaptive_heun', 'dopri8', 'prox']
     opt_methods = ['grad_desc', 'fletch_reeves', 'nesterov', 'nesterov_restart', 'lbfgs', 'bbstep']
     prox_methods = ['crank_nicolson', 'euler', 'euler3', 'bdf2', 'bdf3', 'bdf4']
 
     opt['adjoint'] = not opt['prox']
+    # opt['adjoint_method'] = adjoint_methods[2]
+    # a fixed optimization method for proximal method
     opt_method = opt_methods[1]
-    prox_method = prox_methods[0]
-    print(opt['adjoint_method'])
-
+    #prox_method = prox_methods[0]
+    prox_method = opt['prox_method']
+    if opt['prox']:
+        print(opt['prox_method'])
+    else:
+        print(opt['adjoint_method'])
 
     start_time = time.time()
     rec = Recorder()
@@ -453,10 +464,10 @@ if __name__ == '__main__':
     
     #set tolerance scales
     if opt['prox']:
-        tolscales = opt['time'] / np.arange(4, 20)
+        tolscales = np.arange(1000,1001) 
         appname = opt_method + '_' + prox_method
     else:
-        tolscales =np.arange(1000,1001) 
+        tolscales = np.arange(1000,1001) 
         appname = opt['adjoint_method']
     
     #train the model for different tolerance
@@ -466,7 +477,8 @@ if __name__ == '__main__':
         rec['prox_int_step'] = tolscale
         if opt['prox']:
             odeint = adjoint.odeint_adjoint if opt['adjoint'] else odeprox.odeint
-            opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=tolscale, opt_step=0.3, options={'tol':1e-6})
+            #opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=tolscale, opt_step=0.3, options={'tol':1e-6})
+            opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=tolscale, opt_step=0.3, options={'tol':1e-4})
         for i in range(opt['num_runs']): #opt['num_runs'] default 1
             run_start_time = time.time()
             for t in time_list:

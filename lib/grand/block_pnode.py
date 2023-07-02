@@ -39,7 +39,7 @@ class PNODEblock(ODEblock):
     reg_states = tuple( torch.zeros(x.size(0)).to(x) for i in range(self.nreg) )
     #state = torch.zeros(x.size()[0],2,x.size()[1])
     state = (x,) + reg_states if self.training and self.nreg > 0 else x
-  
+    
     if self.training:
       self.ode_train.setupTS(
           state,
@@ -58,6 +58,7 @@ class PNODEblock(ODEblock):
           implicit_form=self.opt['implicit_form'],
           use_dlpack=self.opt['use_dlpack'],
           method=self.opt['method'],
+          enable_adjoint=False
       )
       state_dt = self.ode_test.odeint_adjoint(state, t)
 
@@ -68,6 +69,7 @@ class PNODEblock(ODEblock):
       return z, reg_states
     else: 
       z = state_dt[1]
+      #import pdb;pdb.set_trace()
       return z
 
   def __repr__(self):
