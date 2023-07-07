@@ -54,26 +54,18 @@ class ODEblock(nn.Module):
     self.reg_odefunc.odefunc.x0 = x0.clone().detach()
 
   def set_tol(self):
-    #self.atol = self.opt['tol_scale'] * 1e-7
-    self.atol = self.opt['tol_scale'] * 1e-4
-    #self.rtol = self.opt['tol_scale'] * 1e-9
-    self.rtol = self.opt['tol_scale'] * 1e-4
+    self.atol = self.opt['tol_scale'] * 1e-7
+    self.rtol = self.opt['tol_scale'] * 1e-9
     if self.opt['adjoint']:
-      #self.atol_adjoint = self.opt['tol_scale_adjoint'] * 1e-7
-      self.atol_adjoint = self.opt['tol_scale_adjoint'] * 1e-4
-      #self.rtol_adjoint = self.opt['tol_scale_adjoint'] * 1e-9
-      self.rtol_adjoint = self.opt['tol_scale_adjoint'] * 1e-4
+      self.atol_adjoint = self.opt['tol_scale_adjoint'] * 1e-7
+      self.rtol_adjoint = self.opt['tol_scale_adjoint'] * 1e-9
 
 
   def reset_tol(self):
-    #self.atol = 1e-7
-    #self.rtol = 1e-9
-    #self.atol_adjoint = 1e-7
-    #self.rtol_adjoint = 1e-9
-    self.atol = 1e-4
-    self.rtol = 1e-4
-    self.atol_adjoint = 1e-4
-    self.rtol_adjoint = 1e-4
+    self.atol = 1e-7
+    self.rtol = 1e-9
+    self.atol_adjoint = 1e-7
+    self.rtol_adjoint = 1e-9
 
   def set_time(self, time):
     self.t = torch.tensor([0, time]).to(self.device)
@@ -84,7 +76,6 @@ class ODEblock(nn.Module):
 
 
 class ODEFunc(MessagePassing):
-
   # currently requires in_features = out_features
   def __init__(self, opt, data, device):
     super(ODEFunc, self).__init__()
