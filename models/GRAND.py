@@ -20,9 +20,7 @@ import fcntl
 import sys
 sys.path.append('../../')
 sys.path.append('../lib/grand')
-sys.path.append('../../pnode')
 sys.path.append('../../HeavyBallNODE')
-sys.path.append('../../torchdiffeq/')
 
 petsc4py_path = os.path.join(os.environ["PETSC_DIR"], os.environ["PETSC_ARCH"], "lib")
 sys.path.append(petsc4py_path)
@@ -96,6 +94,7 @@ def train(model, optimizer, data, rec=None):
         lf = torch.nn.functional.nll_loss
         loss = lf(out.log_softmax(dim=-1)[data.train_mask], data.y.squeeze(1)[data.train_mask])
     else:
+        #import pdb;pdb.set_trace()
         lf = torch.nn.CrossEntropyLoss()
         loss = lf(out[data.train_mask], data.y.squeeze()[data.train_mask])
     if model.odeblock.nreg > 0:  # add regularisation - slower for small data, but faster and better performance for large data
@@ -169,10 +168,17 @@ def test_OGB(model, data, opt):
 
     return train_acc, valid_acc, test_acc
 
+def print_common(d1, d2):
+    ck = set(d1).intersection(d2)
+    for k in sorted(ck):
+        print(k," ", d1[k], " vs ", d2[k])
 
 def main(cmd_opt, rec):
     best_opt = best_params_dict[cmd_opt['dataset']]
     opt = {**cmd_opt, **best_opt}
+    #print_common(cmd_opt, best_opt)
+    opt['step_size'] = cmd_opt['step_size']
+    #opt['lr'] = cmd_opt['lr']
     opt['block'] = cmd_opt['block']
     opt['function'] = cmd_opt['function']
     opt['add_source'] = cmd_opt['add_source']
@@ -180,11 +186,15 @@ def main(cmd_opt, rec):
     opt['adjoint'] = cmd_opt['adjoint']
     opt['max_nfe'] = cmd_opt['max_nfe']
     opt['tol_scale'] = cmd_opt['tol_scale']
-    opt['method'] = cmd_opt['adjoint_method']
+    opt['method'] = cmd_opt['method']
     opt['adjoint_method'] = cmd_opt['adjoint_method']
+    opt['adjoint_step_size'] = cmd_opt['adjoint_step_size']
     opt['tol_scale_adjoint'] = cmd_opt['tol_scale_adjoint']
     opt['epoch'] = cmd_opt['epoch']
-    
+    opt['optimizer'] = cmd_opt['optimizer']
+    #import pdb;pdb.set_trace()
+    #print(opt)
+
     np.random.seed(opt['seed'])
     torch.manual_seed(opt['seed'])
     random.seed(opt['seed'])
@@ -215,7 +225,7 @@ def main(cmd_opt, rec):
         noise *= (~data.train_mask)[:, None]
     data.x += noise
     parameters = [p for p in model.parameters() if p.requires_grad]
-    #print_model_params(model)
+    print_model_params(model)
     optimizer = get_optimizer(opt['optimizer'], parameters, lr=opt['lr'], weight_decay=opt['decay'])
     best_time = val_acc = test_acc = train_acc = best_epoch = 0
     this_test = test_OGB if opt['dataset'] == 'ogbn-arxiv' else test
@@ -228,9 +238,8 @@ def main(cmd_opt, rec):
         filename = './{}.txt'.format(opt['adjoint_method'])
     #import pdb;pdb.set_trace()
     with open(filename, 'w') as file:
-        for epoch in range(1, opt['epoch']):
+        for epoch in range(1, opt['epoch']+1):
             start_time = time.time()
-
             tmp_train_acc, tmp_val_acc, tmp_test_acc = this_test(model, data, opt)
             loss = train(model, optimizer, data)
 
@@ -248,8 +257,8 @@ def main(cmd_opt, rec):
                 best_time = model.odeblock.test_integrator.solver.best_time
 
             log = 'Epoch: {:03d}, Runtime {:03f}, Loss {:03f}, forward nfe {:d}, backward nfe {:d}, Train: {:.4f}, Val: {:.4f}, Test: {:.4f}, Best time: {:.4f}'
-            fnfe = model.fm.sum
-            bnfe = model.bm.sum
+            fnfe = model.fm.val
+            bnfe = model.bm.val
             print(
                 log.format(epoch, time.time() - start_time, loss, fnfe, bnfe, train_acc, val_acc, test_acc,
                             best_time))
@@ -419,11 +428,13 @@ if __name__ == '__main__':
     #cmdstr += '--prox'
     cmdstr = cmdstr.split(' ') + sys.argv[1:]
     args, unknown = parser.parse_known_args(cmdstr)
-    # args = parser.parse_args(cmdstr) 
+    # args = parser.parse_args(cmdstr)
+
     opt = vars(args)
     
     if opt['block'] == 'pnode':
         sys.argv = [sys.argv[0]] + unknown
+        print(sys.argv)
         petsc4py.init(sys.argv)
 
     adjoint_methods = ['dopri5', 'adaptive_heun', 'dopri8', 'prox']
@@ -435,6 +446,10 @@ if __name__ == '__main__':
     opt_method = opt_methods[1]
     #prox_method = prox_methods[0]
     prox_method = opt['prox_method']
+    if opt['adjoint']:
+        print(opt['adjoint_method'])
+    else:
+        print(opt['prox_method'])
 
     start_time = time.time()
     rec = Recorder()
@@ -454,66 +469,118 @@ if __name__ == '__main__':
     x0 = opt['x0']
 
     if opt['prox']:
-        #tolscales = opt['time'] / np.arange(4, 20)
-        tolscales = np.arange(1,2)
         appname = opt_method + '_' + prox_method
     else:
-        #tolscales = 2 ** np.arange(9, 10)
-        tolscales = np.arange(1,2)
         appname = opt['adjoint_method']
-
-    for tolscale in tolscales:
-        opt['tol_scale'] = tolscale
-        opt['tol_scale_adjoint'] = tolscale
-        rec['prox_int_step'] = tolscale
-        if opt['prox']:
-            odeint = adjoint.odeint_adjoint if opt['adjoint'] else odeprox.odeint
-            #opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=tolscale, opt_step=0.3, options={'tol':1e-6})
-            opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=tolscale, opt_step=0.3, options={'tol':1e-4})
-        for i in range(opt['num_runs']):
-            run_start_time = time.time()
-            for t in time_list:
-                opt['time'] = t
-                
-                print('time {} run {}'.format(t, i))
-                opt['seed'] = i
-                np.random.seed(opt['seed'])
-                torch.manual_seed(opt['seed'])
-                random.seed(opt['seed'])
-                np.random.RandomState(opt['seed'])
-                if torch.cuda.is_available():
-                    torch.cuda.manual_seed_all(opt['seed'])
-
-                train_acc_val, val_acc_val, test_acc_val = main(opt, rec)
-
-                t_rep = str(int(t)).zfill(3)
-                rec[t_rep] = test_acc_val
-                mean_rec[t_rep] = test_acc_val
-                
-            rec['#time_elapsed'] = (time.time() - run_start_time) / 3600.0
-            rec['#x0'] = int(x0)
-            rec['#ntpc'] = opt['num_train_per_class']
-            rec['#numruns'] = opt['num_runs']
-            rec['#runnum'] = i
-            #rec['log10atol'] = np.log10(tolscale) - 7
-            rec['log10atol'] = np.log10(tolscale) - 4
-            #rec['log10rtol'] = np.log10(tolscale) - 9
-            rec['log10rtol'] = np.log10(tolscale) - 4
+    rec['prox_int_step'] = opt['tol_scale']
+    if opt['prox']:
+        odeint = adjoint.odeint_adjoint if opt['adjoint'] else odeprox.odeint
+        #opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=tolscale, opt_step=0.3, options={'tol':1e-6})
+        opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=opt['step_size'], opt_step=0.3, options={'tol':1e-6})
+    for i in range(opt['num_runs']):
+        run_start_time = time.time()
+        for t in time_list:
+            opt['time'] = t
             
-            rec.capture(verbose=True)
-            rec.writecsv(
-                os.path.join(dirname, 'GNN_{}_{}.csv'.format(opt['dataset'], appname)))
+            print('time {} run {}'.format(t, i))
+            opt['seed'] = i
+            np.random.seed(opt['seed'])
+            torch.manual_seed(opt['seed'])
+            random.seed(opt['seed'])
+            np.random.RandomState(opt['seed'])
+            if torch.cuda.is_available():
+                torch.cuda.manual_seed_all(opt['seed'])
 
-        mean_rec['#x0'] = int(x0)
-        mean_rec['#ntpc'] = opt['num_train_per_class']
-        mean_rec['#numruns'] = opt['num_runs']
-        mean_rec.capture(verbose=True)
-        mean_rec.writecsv(
-            os.path.join(dirname, 'mean_GNN_{}_{}.csv'.format(opt['dataset'], appname)))
-        # del opt['odeprox']
+            train_acc_val, val_acc_val, test_acc_val = main(opt, rec)
+
+            t_rep = str(int(t)).zfill(3)
+            rec[t_rep] = test_acc_val
+            mean_rec[t_rep] = test_acc_val
+            
+        rec['#time_elapsed'] = (time.time() - run_start_time) / 3600.0
+        rec['#x0'] = int(x0)
+        rec['#ntpc'] = opt['num_train_per_class']
+        rec['#numruns'] = opt['num_runs']
+        rec['#runnum'] = i
+        #rec['log10atol'] = np.log10(tolscale) - 7
+        rec['log10atol'] = np.log10(opt['tol_scale']) - 7
+        #rec['log10rtol'] = np.log10(tolscale) - 9
+        rec['log10rtol'] = np.log10(opt['tol_scale']) - 9
+        
+        rec.capture(verbose=True)
+        rec.writecsv(
+            os.path.join(dirname, 'GNN_{}_{}.csv'.format(opt['dataset'], appname)))
+
+    mean_rec['#x0'] = int(x0)
+    mean_rec['#ntpc'] = opt['num_train_per_class']
+    mean_rec['#numruns'] = opt['num_runs']
+    mean_rec.capture(verbose=True)
+    mean_rec.writecsv(
+        os.path.join(dirname, 'mean_GNN_{}_{}.csv'.format(opt['dataset'], appname)))
+    # del opt['odeprox']
     time_elapsed = (time.time() - start_time) / 3600.0
     print('time elapsed', time_elapsed, 'hours')
 
+    # if opt['prox']:
+    #     # tolscales = opt['time'] / np.arange(4, 20)
+    #     tolscales = np.arange(1,2)
+    #     appname = opt_method + '_' + prox_method
+    # else:
+    #     tolscales = 2 ** np.arange(9, 10)
+    #     #tolscales = np.arange(1,2)
+    #     appname = opt['adjoint_method']
+
+    # for tolscale in tolscales:
+    #     opt['tol_scale'] = tolscale
+    #     opt['tol_scale_adjoint'] = tolscale
+    #     rec['prox_int_step'] = tolscale
+    #     if opt['prox']:
+    #         odeint = adjoint.odeint_adjoint if opt['adjoint'] else odeprox.odeint
+    #         #opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=tolscale, opt_step=0.3, options={'tol':1e-6})
+    #         opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=opt['step_size'], opt_step=opt['lr'], options={'tol':1e-6})
+    #     for i in range(opt['num_runs']):
+    #         run_start_time = time.time()
+    #         for t in time_list:
+    #             opt['time'] = t
+                
+    #             print('time {} run {}'.format(t, i))
+    #             opt['seed'] = i
+    #             np.random.seed(opt['seed'])
+    #             torch.manual_seed(opt['seed'])
+    #             random.seed(opt['seed'])
+    #             np.random.RandomState(opt['seed'])
+    #             if torch.cuda.is_available():
+    #                 torch.cuda.manual_seed_all(opt['seed'])
+
+    #             train_acc_val, val_acc_val, test_acc_val = main(opt, rec)
+
+    #             t_rep = str(int(t)).zfill(3)
+    #             rec[t_rep] = test_acc_val
+    #             mean_rec[t_rep] = test_acc_val
+                
+    #         rec['#time_elapsed'] = (time.time() - run_start_time) / 3600.0
+    #         rec['#x0'] = int(x0)
+    #         rec['#ntpc'] = opt['num_train_per_class']
+    #         rec['#numruns'] = opt['num_runs']
+    #         rec['#runnum'] = i
+    #         #rec['log10atol'] = np.log10(tolscale) - 7
+    #         rec['log10atol'] = np.log10(tolscale) - 7
+    #         #rec['log10rtol'] = np.log10(tolscale) - 9
+    #         rec['log10rtol'] = np.log10(tolscale) - 7
+            
+    #         rec.capture(verbose=True)
+    #         rec.writecsv(
+    #             os.path.join(dirname, 'GNN_{}_{}.csv'.format(opt['dataset'], appname)))
+
+    #     mean_rec['#x0'] = int(x0)
+    #     mean_rec['#ntpc'] = opt['num_train_per_class']
+    #     mean_rec['#numruns'] = opt['num_runs']
+    #     mean_rec.capture(verbose=True)
+    #     mean_rec.writecsv(
+    #         os.path.join(dirname, 'mean_GNN_{}_{}.csv'.format(opt['dataset'], appname)))
+    #     # del opt['odeprox']
+    # time_elapsed = (time.time() - start_time) / 3600.0
+    # print('time elapsed', time_elapsed, 'hours')
 
 # In[ ]:
 

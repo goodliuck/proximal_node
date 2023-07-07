@@ -10,6 +10,7 @@ from block_transformer_rewiring import RewireAttODEblock
 from function_hbnode import HeavyBallNODEFunc
 from block_heavyball import HBNODEblock
 from block_pnode import PNODEblock
+from function_imex import IMEXFunc
 
 class BlockNotDefined(Exception):
   pass
@@ -49,6 +50,8 @@ def set_function(opt):
     f = ODEFuncTransformerAtt
   elif ode_str == 'hbnode':
     f = HeavyBallNODEFunc
+  elif ode_str == 'imex':
+    f = IMEXFunc
   else:
     raise FunctionNotDefined
   return f

@@ -39,28 +39,58 @@ class PNODEblock(ODEblock):
     reg_states = tuple( torch.zeros(x.size(0)).to(x) for i in range(self.nreg) )
     #state = torch.zeros(x.size()[0],2,x.size()[1])
     state = (x,) + reg_states if self.training and self.nreg > 0 else x
-    
-    if self.training:
-      self.ode_train.setupTS(
-          state,
-          self.final_func,
-          step_size=self.opt['step_size'],
-          implicit_form=self.opt['implicit_form'],
-          use_dlpack=self.opt['use_dlpack'],
-          method=self.opt['method'],
-      )
-      state_dt = self.ode_train.odeint_adjoint(state, t)
+    if self.opt['function'] == "imex":
+      if self.training:
+        self.ode_train.setupTS(
+            state,
+            self.odefunc.funcIM,
+            step_size=self.opt['step_size'],
+            method="imex",
+            enable_adjoint=True,
+            implicit_form=self.opt['implicit_form'],
+            imex_form=True,
+            func2=self.odefunc.funcEX,
+            batch_size=state.size(dim=0),
+            # matrixfree_solve=False,
+        )
+        state_dt = self.ode_train.odeint_adjoint(state, t)
+      else:
+        self.ode_test.setupTS(
+            state,
+            self.odefunc.funcIM,
+            step_size=self.opt['step_size'],
+            method="imex",
+            enable_adjoint=False,
+            implicit_form=self.opt['implicit_form'],
+            imex_form=True,
+            func2=self.odefunc.funcEX,
+            batch_size=state.size(dim=0),
+            # matrixfree_solve=False,
+        )
+        state_dt = self.ode_test.odeint_adjoint(state, t)
     else:
-      self.ode_test.setupTS(
-          state,
-          self.final_func,
-          step_size=self.opt['step_size'],
-          implicit_form=self.opt['implicit_form'],
-          use_dlpack=self.opt['use_dlpack'],
-          method=self.opt['method'],
-          enable_adjoint=False
-      )
-      state_dt = self.ode_test.odeint_adjoint(state, t)
+      if self.training:
+        self.ode_train.setupTS(
+            state,
+            self.final_func,
+            step_size=self.opt['step_size'],
+            implicit_form=self.opt['implicit_form'],
+            use_dlpack=self.opt['use_dlpack'],
+            method=self.opt['method'],
+            enable_adjoint=True
+        )
+        state_dt = self.ode_train.odeint_adjoint(state, t)
+      else:
+        self.ode_test.setupTS(
+            state,
+            self.final_func,
+            step_size=self.opt['step_size'],
+            implicit_form=self.opt['implicit_form'],
+            use_dlpack=self.opt['use_dlpack'],
+            method=self.opt['method'],
+            enable_adjoint=False
+        )
+        state_dt = self.ode_test.odeint_adjoint(state, t)
 
     if self.training and self.nreg > 0:
       z = state_dt[0,1]
