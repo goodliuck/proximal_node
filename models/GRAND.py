@@ -177,21 +177,21 @@ def main(cmd_opt, rec):
     best_opt = best_params_dict[cmd_opt['dataset']]
     opt = {**cmd_opt, **best_opt}
     #print_common(cmd_opt, best_opt)
-    opt['step_size'] = cmd_opt['step_size']
+    #opt['step_size'] = cmd_opt['step_size']
     #opt['lr'] = cmd_opt['lr']
     opt['block'] = cmd_opt['block']
     opt['function'] = cmd_opt['function']
-    opt['add_source'] = cmd_opt['add_source']
-    opt['time'] = cmd_opt['time']
+    #opt['add_source'] = cmd_opt['add_source']
+    #opt['time'] = cmd_opt['time']
     opt['adjoint'] = cmd_opt['adjoint']
-    opt['max_nfe'] = cmd_opt['max_nfe']
-    opt['tol_scale'] = cmd_opt['tol_scale']
+    #opt['max_nfe'] = cmd_opt['max_nfe']
+    #opt['tol_scale'] = cmd_opt['tol_scale']
     opt['method'] = cmd_opt['method']
     opt['adjoint_method'] = cmd_opt['adjoint_method']
-    opt['adjoint_step_size'] = cmd_opt['adjoint_step_size']
-    opt['tol_scale_adjoint'] = cmd_opt['tol_scale_adjoint']
-    opt['epoch'] = cmd_opt['epoch']
-    opt['optimizer'] = cmd_opt['optimizer']
+    #opt['adjoint_step_size'] = cmd_opt['adjoint_step_size']
+    #opt['tol_scale_adjoint'] = cmd_opt['tol_scale_adjoint']
+    #opt['epoch'] = cmd_opt['epoch']
+    #opt['optimizer'] = cmd_opt['optimizer']
     #import pdb;pdb.set_trace()
     #print(opt)
 
@@ -225,17 +225,17 @@ def main(cmd_opt, rec):
         noise *= (~data.train_mask)[:, None]
     data.x += noise
     parameters = [p for p in model.parameters() if p.requires_grad]
-    print_model_params(model)
+    #print_model_params(model)
     optimizer = get_optimizer(opt['optimizer'], parameters, lr=opt['lr'], weight_decay=opt['decay'])
     best_time = val_acc = test_acc = train_acc = best_epoch = 0
     this_test = test_OGB if opt['dataset'] == 'ogbn-arxiv' else test
 
     if opt['prox']:
-        filename = './prox_{}.txt'.format(opt['prox_method'])
-    elif opt['block'] == 'pnode':
-        filename = './pnode_{}.txt'.format(opt['adjoint_method'])
+        filename = './{}_prox_{}_{}_{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['prox_method'])
+    elif opt['imex']:
+        filename = './{}_{}_{}_imex.txt'.format(opt['dataset'], opt['block'], opt['function'])
     else:
-        filename = './{}.txt'.format(opt['adjoint_method'])
+        filename = './{}_{}_{}_{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['adjoint_method'])
     #import pdb;pdb.set_trace()
     with open(filename, 'w') as file:
         for epoch in range(1, opt['epoch']+1):
@@ -421,6 +421,7 @@ if __name__ == '__main__':
     parser.add_argument("--implicit_form", action="store_true")
     parser.add_argument("--double_prec", action="store_true")
     parser.add_argument("--use_dlpack", action="store_true")
+    parser.add_argument("--imex", action="store_true")
     
     
     cmdstr = '--dataset CoauthorCS --num_train_per_class 20 --time 10 --epoch 50 '
@@ -476,6 +477,7 @@ if __name__ == '__main__':
     if opt['prox']:
         odeint = adjoint.odeint_adjoint if opt['adjoint'] else odeprox.odeint
         #opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=tolscale, opt_step=0.3, options={'tol':1e-6})
+        #opt_step is the learning rate for proxNode
         opt['odeprox'] = KwargsWrapper(odeint, mode='r', opt_method=opt_method, prox_method=prox_method, int_step=opt['step_size'], opt_step=0.3, options={'tol':1e-6})
     for i in range(opt['num_runs']):
         run_start_time = time.time()
