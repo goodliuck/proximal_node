@@ -5,6 +5,24 @@ import torch
 from utils import get_rw_adj, gcn_norm_fill_val
 from pnode import petsc_adjoint
 
+import torch
+from torch import nn
+from base_classes import ODEFunc
+
+class ODEFuncIM(ODEFunc):
+  def __init__(self, in_features, out_features, opt, data, device):
+    super(ODEFuncIM, self).__init__(opt, data, device)
+    self.A = nn.Identity()
+    self.nfe = 0
+ 
+  def forward(self, t, y):
+    self.nfe += 1
+    if not self.opt['no_alpha_sigmoid']:
+      alpha = torch.sigmoid(self.alpha_train)
+    else:
+      alpha = self.alpha_train
+    return -alpha*self.A(y)
+    
 
 class PNODEblock(ODEblock):
   def __init__(self, odefunc, regularization_fns, opt, data, device, t=torch.tensor([0, 1])):
@@ -33,38 +51,42 @@ class PNODEblock(ODEblock):
     #construct an ODEPetsc object for testing
     self.ode_test = petsc_adjoint.ODEPetsc()
 
+    self.funcIM = ODEFuncIM(self.aug_dim * opt['hidden_dim'], self.aug_dim * opt['hidden_dim'], opt, data, device)
+
   def forward(self, x):
     t = self.t.type_as(x)
     #torch.zeros(n_b, *self.nhid, device=x.device)
     reg_states = tuple( torch.zeros(x.size(0)).to(x) for i in range(self.nreg) )
     #state = torch.zeros(x.size()[0],2,x.size()[1])
     state = (x,) + reg_states if self.training and self.nreg > 0 else x
-    if self.opt['function'] == "imex":
+    if self.opt['imex']:
       if self.training:
         self.ode_train.setupTS(
             state,
-            self.odefunc.funcIM,
+            self.funcIM,
             step_size=self.opt['step_size'],
             method="imex",
             enable_adjoint=True,
             implicit_form=self.opt['implicit_form'],
             imex_form=True,
-            func2=self.odefunc.funcEX,
+            func2=self.odefunc,
             batch_size=state.size(dim=0),
+            use_dlpack=self.opt['use_dlpack'],
             # matrixfree_solve=False,
         )
         state_dt = self.ode_train.odeint_adjoint(state, t)
       else:
         self.ode_test.setupTS(
             state,
-            self.odefunc.funcIM,
+            self.funcIM,
             step_size=self.opt['step_size'],
             method="imex",
             enable_adjoint=False,
             implicit_form=self.opt['implicit_form'],
             imex_form=True,
-            func2=self.odefunc.funcEX,
+            func2=self.odefunc,
             batch_size=state.size(dim=0),
+            use_dlpack=self.opt['use_dlpack'],
             # matrixfree_solve=False,
         )
         state_dt = self.ode_test.odeint_adjoint(state, t)
