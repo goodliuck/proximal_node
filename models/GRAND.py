@@ -29,10 +29,6 @@ import petsc4py
 import proxNode.lib.prox.odeprox as odeprox
 import proxNode.lib.prox.adjoint as adjoint
 
-from proxNode.lib.grand.data import get_dataset, set_train_val_test_split
-from proxNode.lib.grand.GNN import GNN
-from proxNode.lib.grand.GNN_early import GNNEarly
-from proxNode.lib.grand.best_params import best_params_dict
 from proxNode.lib.recorder import Recorder
 
 
@@ -174,21 +170,26 @@ def print_common(d1, d2):
         print(k," ", d1[k], " vs ", d2[k])
 
 def main(cmd_opt, rec):
+    from proxNode.lib.grand.data import get_dataset, set_train_val_test_split
+    from proxNode.lib.grand.GNN import GNN
+    from proxNode.lib.grand.GNN_early import GNNEarly
+    from proxNode.lib.grand.best_params import best_params_dict
     best_opt = best_params_dict[cmd_opt['dataset']]
     opt = {**cmd_opt, **best_opt}
     #print_common(cmd_opt, best_opt)
-    #opt['step_size'] = cmd_opt['step_size']
-    #opt['lr'] = cmd_opt['lr']
+
+    opt['adjoint'] = cmd_opt['adjoint']
     opt['block'] = cmd_opt['block']
     opt['function'] = cmd_opt['function']
-    #opt['add_source'] = cmd_opt['add_source']
-    #opt['time'] = cmd_opt['time']
-    opt['adjoint'] = cmd_opt['adjoint']
-    #opt['max_nfe'] = cmd_opt['max_nfe']
-    #opt['tol_scale'] = cmd_opt['tol_scale']
     opt['method'] = cmd_opt['method']
     opt['adjoint_method'] = cmd_opt['adjoint_method']
-    #opt['adjoint_step_size'] = cmd_opt['adjoint_step_size']
+    opt['step_size'] = cmd_opt['step_size']
+    opt['adjoint_step_size'] = cmd_opt['adjoint_step_size']
+    opt['max_nfe'] = cmd_opt['max_nfe']
+    #opt['add_source'] = cmd_opt['add_source']
+    #opt['time'] = cmd_opt['time']
+    #opt['lr'] = cmd_opt['lr']
+    #opt['tol_scale'] = cmd_opt['tol_scale']
     #opt['tol_scale_adjoint'] = cmd_opt['tol_scale_adjoint']
     #opt['epoch'] = cmd_opt['epoch']
     #opt['optimizer'] = cmd_opt['optimizer']
@@ -229,15 +230,16 @@ def main(cmd_opt, rec):
     optimizer = get_optimizer(opt['optimizer'], parameters, lr=opt['lr'], weight_decay=opt['decay'])
     best_time = val_acc = test_acc = train_acc = best_epoch = 0
     this_test = test_OGB if opt['dataset'] == 'ogbn-arxiv' else test
-
+ 
+    #import pdb;pdb.set_trace()
     if opt['prox']:
         filename = './{}_prox_{}_{}_{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['prox_method'])
     elif opt['imex']:
-        filename = './{}_{}_{}_imex.txt'.format(opt['dataset'], opt['block'], opt['function'])
+        filename = './{}_{}_{}_imex{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['filename_suffix'])
     else:
         filename = './{}_{}_{}_{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['adjoint_method'])
     #import pdb;pdb.set_trace()
-    with open(filename, 'w') as file:
+    with open(filename, 'a') as file:
         for epoch in range(1, opt['epoch']+1):
             start_time = time.time()
             tmp_train_acc, tmp_val_acc, tmp_test_acc = this_test(model, data, opt)
@@ -422,6 +424,7 @@ if __name__ == '__main__':
     parser.add_argument("--double_prec", action="store_true")
     parser.add_argument("--use_dlpack", action="store_true")
     parser.add_argument("--imex", action="store_true")
+    parser.add_argument("--filename_suffix", type=str, default="")
     
     
     cmdstr = '--dataset CoauthorCS --num_train_per_class 20 --time 10 --epoch 50 '
