@@ -225,5 +225,5 @@ if __name__ == '__main__':
          }
   dataset = get_dataset(opt, '../data', False)
   t = 1
-  func = ODEFuncTransformerAtt(dataset.data.num_features, 6, opt, dataset.data, device)
+  func = myODEFuncTransformerAtt(dataset.data.num_features, 6, opt, dataset.data, device)
   out = func(t, dataset.data.x)
