@@ -239,11 +239,12 @@ def main(cmd_opt, rec):
     else:
         filename = './{}_{}_{}_{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['adjoint_method'])
     #import pdb;pdb.set_trace()
-    with open(filename, 'a') as file:
+    with open(filename, 'w') as file:
         for epoch in range(1, opt['epoch']+1):
             start_time = time.time()
             tmp_train_acc, tmp_val_acc, tmp_test_acc = this_test(model, data, opt)
             loss = train(model, optimizer, data)
+            #print(model.odeblock.ode_train.ts.getARKIMEXType())
 
             if tmp_val_acc > val_acc:
                 best_epoch = epoch
