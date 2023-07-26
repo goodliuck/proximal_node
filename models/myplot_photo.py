@@ -1,0 +1,68 @@
+import pandas as pd
+#import numpy as np
+import matplotlib.pyplot as plt
+#import pdb; pdb.set_trace()
+
+# Read the text file into a DataFrame
+photo_l_dopri5 = pd.read_csv('./Photo_attention_laplacian_dopri5.txt', delimiter=',',header=None)
+photo_l_dopri8 = pd.read_csv('./Photo_attention_laplacian_dopri8.txt', delimiter=',',header=None)
+photo_l_adaptive_heun = pd.read_csv('./Photo_attention_laplacian_adaptive_heun.txt', delimiter=',',header=None)
+photo_l_implicit_adams = pd.read_csv('./Photo_attention_laplacian_implicit_adams.txt', delimiter=',',header=None)
+photo_nl_dopri5 = pd.read_csv('./Photo_constant_transformer_dopri5.txt', delimiter=',',header=None)
+photo_nl_dopri8 = pd.read_csv('./Photo_constant_transformer_dopri8.txt', delimiter=',',header=None)
+photo_nl_adaptive_heun = pd.read_csv('./Photo_constant_transformer_adaptive_heun.txt', delimiter=',',header=None)
+photo_nl_implicit_adams = pd.read_csv('./Photo_constant_transformer_implicit_adams.txt', delimiter=',',header=None)
+photo_pnode_imex = pd.read_csv('./Photo_pnode_mytransformer_imex.txt', delimiter=',',header=None)
+
+
+fig, (ax1, ax2, ax3) = plt.subplots(1, 3)
+# make a little extra space between the subplots
+fig.subplots_adjust(hspace=0.33)
+
+ax1.scatter(photo_l_dopri5.iloc[:, 0], photo_l_dopri5.iloc[:, 3], label='l_dopri5', color='blue')
+ax1.scatter(photo_l_dopri8.iloc[:, 0], photo_l_dopri8.iloc[:, 3], label='l_dopri8', color='black')
+ax1.scatter(photo_l_adaptive_heun.iloc[:, 0], photo_l_adaptive_heun.iloc[:, 3], label='l_adaptive heun', color='red')
+ax1.scatter(photo_l_implicit_adams.iloc[:, 0], photo_l_implicit_adams.iloc[:, 3], label='l_implicit_adams', color='cyan')
+ax1.scatter(photo_nl_dopri5.iloc[:, 0], photo_nl_dopri5.iloc[:, 3], label='nl_dopri5', color='pink')
+ax1.scatter(photo_nl_dopri8.iloc[:, 0], photo_nl_dopri8.iloc[:, 3], label='nl_dopri8', color='yellow')
+ax1.scatter(photo_nl_adaptive_heun.iloc[:, 0], photo_nl_adaptive_heun.iloc[:, 3], label='nl_adaptive_heun', color='orange')
+ax1.scatter(photo_nl_implicit_adams.iloc[:, 0], photo_nl_implicit_adams.iloc[:, 3], label='nl_implicit_adams', color='brown')
+ax1.scatter(photo_pnode_imex.iloc[:, 0], photo_pnode_imex.iloc[:, 3], label='pnode_imex', color='green')
+#ax1.scatter(prox_bdf4.iloc[:, 0], prox_bdf4.iloc[:, 3], label='prox_bdf4', color='purple')
+ax1.set_xlim(1, photo_l_dopri5.iloc[-1, 0])
+ax1.set_xlabel('Epoch')
+ax1.set_ylabel('NFE')
+ax1.legend()
+
+ax2.plot(photo_l_dopri5.iloc[:, 0], photo_l_dopri5.iloc[:, 2], label='l_dopri5', color='blue')
+ax2.plot(photo_l_dopri8.iloc[:, 0], photo_l_dopri8.iloc[:, 2], label='l_dopri8', color='black')
+ax2.plot(photo_l_adaptive_heun.iloc[:, 0], photo_l_adaptive_heun.iloc[:, 2], label='l_adaptive heun', color='red')
+ax2.plot(photo_l_implicit_adams.iloc[:, 0], photo_l_implicit_adams.iloc[:, 2], label='l_implicit_adams', color='cyan')
+ax2.plot(photo_nl_dopri5.iloc[:, 0], photo_nl_dopri5.iloc[:, 2], label='nl_dopri5', color='pink')
+ax2.plot(photo_nl_dopri8.iloc[:, 0], photo_nl_dopri8.iloc[:, 2], label='nl_dopri8', color='yellow')
+ax2.plot(photo_nl_adaptive_heun.iloc[:, 0], photo_nl_adaptive_heun.iloc[:, 2], label='nl_adaptive_heun', color='orange')
+ax2.plot(photo_nl_implicit_adams.iloc[:, 0], photo_nl_implicit_adams.iloc[:, 2], label='nl_implicit_adams', color='brown')
+ax2.plot(photo_pnode_imex.iloc[:, 0], photo_pnode_imex.iloc[:, 2], label='pnode_imex', color='green')
+#ax2.plot(prox_bdf4.iloc[:, 0], prox_bdf4.iloc[:, 2], label='prox_bdf4', color='purple')
+ax2.set_xlim(1, photo_l_dopri5.iloc[-1, 0])
+ax2.set_xlabel('Epoch')
+ax2.set_ylabel('Training Loss')
+ax2.legend()
+
+ax3.plot(photo_l_dopri5.iloc[:, 0], 100 * photo_l_dopri5.iloc[:, 7], label='l_dopri5', color='blue')
+ax3.plot(photo_l_dopri8.iloc[:, 0], 100 * photo_l_dopri8.iloc[:, 7], label='l_dopri8', color='black')
+ax3.plot(photo_l_adaptive_heun.iloc[:, 0], 100 * photo_l_adaptive_heun.iloc[:, 7], label='l_adaptive heun', color='red')
+ax3.plot(photo_l_implicit_adams.iloc[:, 0], 100 * photo_l_implicit_adams.iloc[:, 7], label='l_implicit_adams', color='cyan')
+ax3.plot(photo_nl_dopri5.iloc[:, 0], 100 * photo_nl_dopri5.iloc[:, 7], label='nl_dopri5', color='pink')
+ax3.plot(photo_nl_dopri8.iloc[:, 0], 100 * photo_nl_dopri8.iloc[:, 7], label='nl_dopri8', color='yellow')
+ax3.plot(photo_nl_adaptive_heun.iloc[:, 0], 100 * photo_nl_adaptive_heun.iloc[:, 7], label='nl_adaptive_heun', color='orange')
+ax3.plot(photo_nl_implicit_adams.iloc[:, 0], 100 * photo_nl_implicit_adams.iloc[:, 7], label='nl_implicit_adams', color='brown')
+ax3.plot(photo_pnode_imex.iloc[:, 0], 100 * photo_pnode_imex.iloc[:, 7], label='pnode_imex', color='green')
+#ax3.plot(prox_bdf4.iloc[:, 0], 100 * prox_bdf4.iloc[:, 7], label='prox_bdf4', color='purple')
+ax3.set_xlim(1, photo_l_dopri5.iloc[-1, 0])
+ax3.set_xlabel('Epoch')
+ax3.set_ylabel('Testing Accuracy (%)')
+ax3.legend()
+
+fig.suptitle('Photo')
+plt.show()
