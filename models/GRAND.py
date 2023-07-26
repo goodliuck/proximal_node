@@ -244,7 +244,6 @@ def main(cmd_opt, rec):
             start_time = time.time()
             tmp_train_acc, tmp_val_acc, tmp_test_acc = this_test(model, data, opt)
             loss = train(model, optimizer, data)
-            #print(model.odeblock.ode_train.ts.getARKIMEXType())
 
             if tmp_val_acc > val_acc:
                 best_epoch = epoch
@@ -269,6 +268,8 @@ def main(cmd_opt, rec):
             # Convert tuple to string with commas
             myresult = ', '.join(str(element) for element in myoutput_info)
 
+            if np.isnan(myoutput_info[2]):
+                break
             # Write the log string to the file
             file.write(myresult + '\n')
         file.close()
