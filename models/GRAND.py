@@ -233,11 +233,11 @@ def main(cmd_opt, rec):
  
     #import pdb;pdb.set_trace()
     if opt['prox']:
-        filename = './{}_prox_{}_{}_{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['prox_method'])
+        filename = './prox_{}_{}_{}_{}{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['prox_method'], opt['filename_suffix'])
     elif opt['imex']:
         filename = './{}_{}_{}_imex{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['filename_suffix'])
     else:
-        filename = './{}_{}_{}_{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['adjoint_method'])
+        filename = './{}_{}_{}_{}{}.txt'.format(opt['dataset'], opt['block'], opt['function'], opt['adjoint_method'], opt['filename_suffix'])
     #import pdb;pdb.set_trace()
     with open(filename, 'w') as file:
         for epoch in range(1, opt['epoch']+1):
